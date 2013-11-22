@@ -23,6 +23,7 @@ module.exports = function(grunt) {
     this.tasks = target.tasks || [];
     this.options = target.options;
     this.startedAt = false;
+    this.success = true;
     this.spawned = null;
     this.changedFiles = Object.create(null);
     if (typeof this.tasks === 'string') {
@@ -39,6 +40,7 @@ module.exports = function(grunt) {
 
     // Start this task run
     self.startedAt = Date.now();
+    self.success = true;
 
     // If no tasks just call done to trigger potential livereload
     if (self.tasks.length < 1) { return done(); }
@@ -59,6 +61,10 @@ module.exports = function(grunt) {
         args: self.tasks.concat(self.options.cliArgs || []),
       }, function(err, res, code) {
         if (self.options.interrupt !== true || (code !== 130 && code !== 1)) {
+          if (code > 0) {
+            grunt.log.writeln(('Task error code '+code+' '+self.name).red);
+            self.success = false;
+          }
           // Spawn is done
           self.spawned = null;
           done();
@@ -77,8 +83,12 @@ module.exports = function(grunt) {
     }
     // Trigger livereload if set
     if (this.livereload) {
-      this.livereload.trigger(Object.keys(this.changedFiles));
-      this.changedFiles = Object.create(null);
+      if (this.success) {
+        this.livereload.trigger(Object.keys(this.changedFiles));
+        this.changedFiles = Object.create(null);
+      } else {
+        grunt.log.error().error('Watched task run failed: ' + this.name);
+      }
     }
     return time;
   };
